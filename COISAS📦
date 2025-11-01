@@ -1,0 +1,174 @@
+-- Script: UnlockMovementDuringSkills.lua
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local humanoid = char:WaitForChild("Humanoid")
+
+-- Velocidades padrÃ£o
+local defaultWalkSpeed = 39
+local defaultJumpPower = 68
+
+-- Se quiser customizar velocidade enquanto a skill estiver ativa
+local skillWalkSpeed = defaultWalkSpeed
+local skillJumpPower = defaultJumpPower
+
+-- MantÃ©m o Humanoid sempre destravado
+RunService.RenderStepped:Connect(function()
+    if humanoid then
+        -- Reaplica as velocidades constantemente
+        humanoid.WalkSpeed = skillWalkSpeed
+        humanoid.JumpPower = skillJumpPower
+    end
+end)
+
+-- Script: PersistentBallResize.lua (corrigido)
+local Workspace = game:GetService("Workspace")
+
+local ballName = "Ball"
+local desiredSize = 34
+local desiredTransparency = 1
+
+local function applyBallProperties(ball)
+	if not ball or not ball:IsA("BasePart") then return end
+
+	task.wait(0.05)
+	ball.Size = Vector3.new(desiredSize, desiredSize, desiredSize)
+	ball.Transparency = desiredTransparency
+	ball.Massless = false
+	ball.CastShadow = true
+
+	print("[Ball Fix] Bola ajustada novamente!")
+end
+
+local function monitorBall(ball)
+	applyBallProperties(ball)
+
+	ball:GetPropertyChangedSignal("Transparency"):Connect(function()
+		if ball.Transparency ~= desiredTransparency then
+			applyBallProperties(ball)
+		end
+	end)
+
+	ball:GetPropertyChangedSignal("Size"):Connect(function()
+		if ball.Size.Magnitude ~= desiredSize then
+			applyBallProperties(ball)
+		end
+	end)
+end
+
+local existingBall = Workspace:FindFirstChild(ballName)
+if existingBall then
+	monitorBall(existingBall)
+end
+
+Workspace.ChildAdded:Connect(function(child)
+	if child.Name == ballName and child:IsA("BasePart") then
+		monitorBall(child)
+	end
+end)
+
+
+-- ServiÃ§os
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- ConfiguraÃ§Ãµes do dash
+local dashDistance = 34   -- distÃ¢ncia do dash pra trÃ¡s (ajustada)
+local dashTime = 0.3      -- tempo do dash (0.3 = rÃ¡pido e suave)
+
+-- FunÃ§Ã£o para o dash suave pra trÃ¡s
+local function dashBackward()
+	if not hrp then return end
+	local backward = -hrp.CFrame.LookVector
+	local goal = { CFrame = hrp.CFrame + backward * dashDistance }
+
+	local tween = TweenService:Create(hrp, TweenInfo.new(dashTime, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), goal)
+	tween:Play()
+end
+
+-- FunÃ§Ã£o que usa a skill e ativa o dash
+local function useSkill(skillName)
+	if skillName == "Skill3" then
+		dashBackward()
+		ReplicatedStorage.SkillActivated:FireServer("CONTROL", skillName)
+	end
+end
+
+-- GUI do botÃ£o
+local screenGui = Instance.new("ScreenGui", playerGui)
+screenGui.Name = "DashButtonGui"
+screenGui.ResetOnSpawn = false
+
+local button = Instance.new("TextButton", screenGui)
+button.Size = UDim2.new(0, 120, 0, 50)
+button.Position = UDim2.new(0.8, 0, 0.8, 0)
+button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.Text = "BACK DASH"
+button.Font = Enum.Font.LuckiestGuy
+button.TextScaled = true
+button.AutoButtonColor = true
+button.Active = true
+
+-- Cantos arredondados
+local corner = Instance.new("UICorner", button)
+corner.CornerRadius = UDim.new(0, 10)
+
+-- Contorno
+local stroke = Instance.new("UIStroke", button)
+stroke.Thickness = 2
+stroke.Color = Color3.fromRGB(0, 0, 0)
+
+-- AÃ§Ã£o ao clicar
+button.MouseButton1Click:Connect(function()
+	useSkill("Skill3")
+end)
+
+-- Tornar o botÃ£o arrastÃ¡vel (mobile + PC)
+local dragging = false
+local dragInput, mousePos, framePos
+
+local function updateInput(input)
+	local delta = input.Position - mousePos
+	button.Position = UDim2.new(
+		framePos.X.Scale,
+		framePos.X.Offset + delta.X,
+		framePos.Y.Scale,
+		framePos.Y.Offset + delta.Y
+	)
+end
+
+button.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		mousePos = input.Position
+		framePos = button.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+button.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		dragInput = input
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if dragging and input == dragInput then
+		updateInput(input)
+	end
+end)
